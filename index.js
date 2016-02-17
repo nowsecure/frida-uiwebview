@@ -1,0 +1,239 @@
+'use strict';
+
+let DUMP_DOM_SCRIPT, SET_ELEMENT_TEXT_SCRIPT, CLICK_ELEMENT_SCRIPT, TAP_ELEMENT_SCRIPT;
+
+function get(webViewNode, predicate) {
+  return new Promise(function (resolve, reject) {
+    let tries = 0;
+    function tryResolve() {
+      const layout = WebNode.fromWebView(webViewNode.instance);
+      if (layout !== null) {
+        const node = layout.find(predicate);
+        if (node !== null) {
+          resolve(node);
+          return;
+        }
+      }
+
+      // TODO: configurable timeout and retry interval
+      tries++;
+      if (tries < 40) {
+        setTimeout(tryResolve, 500);
+      } else {
+        reject(new Error('Timed out'));
+      }
+    }
+    tryResolve();
+  });
+}
+
+function WebNode(data, webView) {
+  this._webView = webView;
+
+  for (let key in data) {
+    if (data.hasOwnProperty(key) && key !== 'children') {
+      this[key] = data[key];
+    }
+  }
+
+  this.children = data.children.map(childData => {
+    return new WebNode(childData, webView);
+  });
+}
+
+WebNode.fromWebView = function (webView) {
+  const rawData = webView.stringByEvaluatingJavaScriptFromString_('JSON.stringify((' + DUMP_DOM_SCRIPT + ').call(this));').toString();
+  if (rawData.length === 0)
+    return null;
+  const data = JSON.parse(rawData);
+  return new WebNode(data, webView);
+};
+
+WebNode.prototype = {
+  forEach(fn) {
+    fn(this);
+    this.children.forEach(child => child.forEach(fn));
+  },
+  find(predicate) {
+    if (predicate(this)) {
+      return this;
+    }
+
+    const children = this.children;
+    for (let i = 0; i !== children.length; i++) {
+      const child = children[i].find(predicate);
+      if (child !== null) {
+        return child;
+      }
+    }
+
+    return null;
+  },
+  setText(text) {
+    perform(this._webView, SET_ELEMENT_TEXT_SCRIPT, {
+      ref: this.ref,
+      text: text
+    });
+  },
+  click() {
+    perform(this._webView, CLICK_ELEMENT_SCRIPT, {
+      ref: this.ref
+    });
+  },
+  tap() {
+    perform(this._webView, TAP_ELEMENT_SCRIPT, {
+      ref: this.ref
+    });
+  }
+};
+
+function perform(webView, script, params) {
+  const rawResult = webView.stringByEvaluatingJavaScriptFromString_('JSON.stringify((' + script + ').call(this, ' + JSON.stringify(params) + '));');
+  const result = JSON.parse(rawResult.toString());
+  if (result.error) {
+    const e = result.error;
+    throw new Error(e.message + ' at: ' + e.stack);
+  }
+  return result;
+}
+
+DUMP_DOM_SCRIPT = `function dumpDom() {
+  var elementByRef = {};
+  var nextRef = 1;
+  var ignoredElementNames = {
+    'link': true,
+    'meta': true,
+    'script': true,
+    'style': true,
+    'title': true
+  };
+
+  window._fridaElementByRef = elementByRef;
+
+  try {
+    return dumpElement(document.documentElement);
+  } catch (e) {
+    return {
+      error: e.message
+    };
+  }
+
+  function dumpElement(element) {
+    var ref = nextRef++;
+    elementByRef[ref] = element;
+
+    var name = element.localName;
+
+    var data = {
+      ref: ref,
+      name: name,
+      className: element.className,
+      children: []
+    };
+
+    if (element.id) {
+      data.id = element.id;
+    }
+
+    if (name === 'input') {
+      data.type = element.type || 'text';
+    }
+
+    if (name === 'input' || name === 'button') {
+      data.enabled = !element.disabled;
+    }
+
+    if (name === 'input' && element.placeholder) {
+      data.placeholder = element.placeholder;
+    }
+
+    var i;
+
+    var childNodes = element.childNodes;
+    for (i = 0; i !== childNodes.length; i++) {
+      var childNode = childNodes[i];
+      if (childNode.nodeType === Node.TEXT_NODE) {
+        var text = data.text || '';
+        text += childNode.wholeText;
+        data.text = text;
+      }
+    }
+
+    var children = data.children;
+    var childElements = element.children;
+    for (i = 0; i !== childElements.length; i++) {
+      var childElement = childElements[i];
+      if (!ignoredElementNames[childElement.localName]) {
+        children.push(dumpElement(childElement));
+      }
+    }
+
+    return data;
+  }
+}`;
+
+SET_ELEMENT_TEXT_SCRIPT = `function setElementText(params) {
+  try {
+    var element = window._fridaElementByRef[params.ref];
+    element.value = params.text;
+    var ev = new Event('change');
+    element.dispatchEvent(ev);
+    return {};
+  } catch (e) {
+    return {
+      error: {
+        message: e.message,
+        stack: e.stack
+      }
+    };
+  }
+}`;
+
+CLICK_ELEMENT_SCRIPT = `function clickElement(params) {
+  try {
+    var element = window._fridaElementByRef[params.ref];
+    element.click();
+    return {};
+  } catch (e) {
+    return {
+      error: {
+        message: e.message,
+        stack: e.stack
+      }
+    };
+  }
+}`;
+
+TAP_ELEMENT_SCRIPT = `function tapElement(params) {
+  try {
+    var element = window._fridaElementByRef[params.ref];
+    var identifier = Date.now();
+    fire(element, 'touchstart', identifier);
+    fire(element, 'touchend', identifier);
+    return {};
+  } catch (e) {
+    return {
+      error: {
+        message: e.message,
+        stack: e.stack
+      }
+    };
+  }
+
+  function fire(element, type, identifier) {
+    var touch = document.createTouch(window, element, identifier, 0, 0, 0, 0);
+
+    var touches = document.createTouchList(touch);
+    var targetTouches = document.createTouchList(touch);
+    var changedTouches = document.createTouchList(touch);
+
+    var event = document.createEvent('TouchEvent');
+    event.initTouchEvent(type, true, true, window, null, 0, 0, 0, 0, false, false, false, false, touches, targetTouches, changedTouches, 1, 0);
+    element.dispatchEvent(event);
+  }
+}`;
+
+module.exports = {
+  get: get,
+  WebNode: WebNode
+};
