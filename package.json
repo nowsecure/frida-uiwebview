@@ -5,11 +5,11 @@
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/viaforensics/frida-uiwebview.git"
+    "url": "git+https://github.com/nowsecure/frida-uiwebview.git"
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/viaforensics/frida-uiwebview/issues"
+    "url": "https://github.com/nowsecure/frida-uiwebview/issues"
   },
-  "homepage": "https://github.com/viaforensics/frida-uiwebview#readme"
+  "homepage": "https://github.com/nowsecure/frida-uiwebview#readme"
 }
