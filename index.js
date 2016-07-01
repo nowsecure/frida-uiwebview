@@ -118,7 +118,10 @@ DUMP_DOM_SCRIPT = `function dumpDom() {
     return dumpElement(document.documentElement);
   } catch (e) {
     return {
-      error: e.message
+      error: {
+        message: e.message,
+        stack: e.stack
+      }
     };
   }
 
