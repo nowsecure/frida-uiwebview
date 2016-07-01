@@ -42,11 +42,15 @@ function WebNode(data, webView) {
 }
 
 WebNode.fromWebView = function (webView) {
-  const rawData = webView.stringByEvaluatingJavaScriptFromString_('JSON.stringify((' + DUMP_DOM_SCRIPT + ').call(this));').toString();
-  if (rawData.length === 0)
-    return null;
-  const data = JSON.parse(rawData);
-  return new WebNode(data, webView);
+  const rawResult = webView.stringByEvaluatingJavaScriptFromString_('JSON.stringify((' + DUMP_DOM_SCRIPT + ').call(this));').toString();
+  if (rawResult.length === 0)
+    throw new Error('UIWebView not ready');
+  const result = JSON.parse(rawResult);
+  if (result.error) {
+    const e = result.error;
+    throw new Error(e.message + ' at: ' + e.stack);
+  }
+  return new WebNode(result, webView);
 };
 
 WebNode.prototype = {
