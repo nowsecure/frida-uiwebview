@@ -166,12 +166,14 @@ DUMP_DOM_SCRIPT = `function dumpDom() {
       }
     }
 
-    var children = data.children;
     var childElements = element.children;
-    for (i = 0; i !== childElements.length; i++) {
-      var childElement = childElements[i];
-      if (!ignoredElementNames[childElement.localName]) {
-        children.push(dumpElement(childElement));
+    if (childElements !== undefined) {
+      var children = data.children;
+      for (i = 0; i !== childElements.length; i++) {
+        var childElement = childElements[i];
+        if (!ignoredElementNames[childElement.localName]) {
+          children.push(dumpElement(childElement));
+        }
       }
     }
 
