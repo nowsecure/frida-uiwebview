@@ -1,6 +1,6 @@
 'use strict';
 
-let DUMP_DOM_SCRIPT, SET_ELEMENT_TEXT_SCRIPT, CLICK_ELEMENT_SCRIPT, TAP_ELEMENT_SCRIPT;
+let DUMP_DOM_SCRIPT, SET_ELEMENT_TEXT_SCRIPT, CLICK_ELEMENT_SCRIPT, TAP_ELEMENT_SCRIPT, GET_ELEMENT_RECT_SCRIPT, IS_ELEMENT_VISIBLE_SCRIPT;
 
 function get(webViewNode, predicate) {
   return new Promise(function (resolve, reject) {
@@ -88,6 +88,16 @@ WebNode.prototype = {
     perform(this._webView, TAP_ELEMENT_SCRIPT, {
       ref: this.ref
     });
+  },
+  getRect() {
+    return perform(this._webView, GET_ELEMENT_RECT_SCRIPT, {
+      ref: this.ref
+    }).rect;
+  },
+  isVisible() {
+    return perform(this._webView, IS_ELEMENT_VISIBLE_SCRIPT, {
+      ref: this.ref
+    }).visible;
   }
 };
 
@@ -240,6 +250,49 @@ TAP_ELEMENT_SCRIPT = `function tapElement(params) {
     event.initTouchEvent(type, true, true, window, null, 0, 0, 0, 0, false, false, false, false, touches, targetTouches, changedTouches, 1, 0);
     element.dispatchEvent(event);
   }
+}`;
+
+GET_ELEMENT_RECT_SCRIPT = `function getElementRect(params) {
+  var element = window._fridaElementByRef[params.ref];
+  var rect = element.getBoundingClientRect();
+  return {
+    rect: [[rect.left, rect.top], [rect.width, rect.height]]
+  };
+}`;
+
+/*
+ * Adapted from: http://stackoverflow.com/a/15203639/5418401
+ */
+IS_ELEMENT_VISIBLE_SCRIPT = `function isElementVisible(params) {
+  var element = window._fridaElementByRef[params.ref];
+  var rect = element.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) {
+    return {
+      visible: false
+    };
+  }
+
+  var vWidth = window.innerWidth || doc.documentElement.clientWidth;
+  var vHeight = window.innerHeight || doc.documentElement.clientHeight;
+  if (rect.right < 0 || rect.bottom < 0 || rect.left > vWidth || rect.top > vHeight) {
+    return {
+      visible: false
+    };
+  }
+
+  var efp = function(x, y) {
+    return document.elementFromPoint(x, y)
+  };
+
+  // Return true if any of its four corners are visible
+  return {
+    visible: (
+      element.contains(efp(rect.left, rect.top)) ||
+      element.contains(efp(rect.right, rect.top)) ||
+      element.contains(efp(rect.right, rect.bottom)) ||
+      element.contains(efp(rect.left, rect.bottom))
+    )
+  };
 }`;
 
 module.exports = {
