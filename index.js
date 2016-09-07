@@ -92,12 +92,12 @@ WebNode.prototype = {
   getRect() {
     return perform(this._webView, GET_ELEMENT_RECT_SCRIPT, {
       ref: this.ref
-    });
+    }).rect;
   },
   isVisible() {
     return perform(this._webView, IS_ELEMENT_VISIBLE_SCRIPT, {
       ref: this.ref
-    });
+    }).visible;
   }
 };
 
@@ -266,7 +266,7 @@ GET_ELEMENT_RECT_SCRIPT = `function getElementRect(params) {
 IS_ELEMENT_VISIBLE_SCRIPT = `function isElementVisible(params) {
   var element = window._fridaElementByRef[params.ref];
   var rect = element.getBoundingClientRect();
-  if (rect.width == 0 || rect.height == 0) {
+  if (rect.width === 0 || rect.height === 0) {
     return {
       visible: false
     };
