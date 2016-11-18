@@ -272,8 +272,8 @@ IS_ELEMENT_VISIBLE_SCRIPT = `function isElementVisible(params) {
     };
   }
 
-  var vWidth = window.innerWidth || doc.documentElement.clientWidth;
-  var vHeight = window.innerHeight || doc.documentElement.clientHeight;
+  var vWidth = window.innerWidth || document.documentElement.clientWidth;
+  var vHeight = window.innerHeight || document.documentElement.clientHeight;
   if (rect.right < 0 || rect.bottom < 0 || rect.left > vWidth || rect.top > vHeight) {
     return {
       visible: false
