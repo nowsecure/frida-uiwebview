@@ -154,6 +154,7 @@ DUMP_DOM_SCRIPT = `function dumpDom() {
 
     if (name === 'input') {
       data.type = element.type || 'text';
+      data.fieldName = element.name;
     }
 
     if (name === 'input' || name === 'button') {
