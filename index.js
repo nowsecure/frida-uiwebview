@@ -285,13 +285,18 @@ IS_ELEMENT_VISIBLE_SCRIPT = `function isElementVisible(params) {
     return document.elementFromPoint(x, y)
   };
 
-  // Return true if any of its four corners are visible
+  // Return true if any of its four corners or the
+  // center are visible
+
+  var rcx = rect.left + rect.width / 2;
+  var rcy = rect.top + rect.height / 2;
   return {
     visible: (
       element.contains(efp(rect.left, rect.top)) ||
       element.contains(efp(rect.right, rect.top)) ||
       element.contains(efp(rect.right, rect.bottom)) ||
-      element.contains(efp(rect.left, rect.bottom))
+      element.contains(efp(rect.left, rect.bottom)) ||
+      element.contains(efp(rcx, rcy))
     )
   };
 }`;
