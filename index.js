@@ -256,8 +256,10 @@ SET_ELEMENT_TEXT_SCRIPT = `function setElementText(params) {
   try {
     var element = window._fridaElementByRef[params.ref];
     element.value = params.text;
-    var ev = new Event('change');
-    element.dispatchEvent(ev);
+    var changeEvent = new Event('change');
+    var inputEvent = new Event('input');
+    element.dispatchEvent(changeEvent);
+    element.dispatchEvent(inputEvent);
     return {};
   } catch (e) {
     return {
