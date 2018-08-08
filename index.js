@@ -129,9 +129,12 @@ function perform(webView, script, params) {
         retType: 'void',
         argTypes: ['object', 'pointer'],
         implementation: function (rawResult, error) {
+          pendingBlocks.delete(completionHandler);
+
           if (!error.isNull()) {
             const err = new ObjC.Object(error);
             reject(new Error(err.toString()));
+            return;
           }
           try {
             const result = parseResult(rawResult);
@@ -139,7 +142,6 @@ function perform(webView, script, params) {
           } catch (e) {
             reject(e);
           }
-          pendingBlocks.delete(completionHandler);
         }
       });
       pendingBlocks.add(completionHandler);
