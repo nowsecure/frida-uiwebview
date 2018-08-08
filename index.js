@@ -1,12 +1,13 @@
 'use strict';
 
 let DUMP_DOM_SCRIPT, SET_ELEMENT_TEXT_SCRIPT, CLICK_ELEMENT_SCRIPT, TAP_ELEMENT_SCRIPT, GET_ELEMENT_RECT_SCRIPT, IS_ELEMENT_VISIBLE_SCRIPT;
+const pendingBlocks = new Set();
 
 function get(webViewNode, predicate) {
   return new Promise(function (resolve, reject) {
     let tries = 0;
-    function tryResolve() {
-      const layout = WebNode.fromWebView(webViewNode.instance);
+    async function tryResolve() {
+      const layout = await WebNode.fromWebView(webViewNode.instance);
       if (layout !== null) {
         const node = layout.find(predicate);
         if (node !== null) {
@@ -23,7 +24,7 @@ function get(webViewNode, predicate) {
         reject(new Error('Timed out'));
       }
     }
-    tryResolve();
+    return tryResolve();
   });
 }
 
@@ -41,15 +42,8 @@ function WebNode(data, webView) {
   });
 }
 
-WebNode.fromWebView = function (webView) {
-  const rawResult = webView.stringByEvaluatingJavaScriptFromString_('JSON.stringify((' + DUMP_DOM_SCRIPT + ').call(this));').toString();
-  if (rawResult.length === 0)
-    throw new Error('UIWebView not ready');
-  const result = JSON.parse(rawResult);
-  if (result.error) {
-    const e = result.error;
-    throw new Error(e.message + ' at: ' + e.stack);
-  }
+WebNode.fromWebView = async function (webView) {
+  const result = await perform(webView, DUMP_DOM_SCRIPT);
   return new WebNode(result, webView);
 };
 
@@ -73,37 +67,105 @@ WebNode.prototype = {
 
     return null;
   },
-  setText(text) {
-    perform(this._webView, SET_ELEMENT_TEXT_SCRIPT, {
+  async setText(text) {
+    return perform(this._webView, SET_ELEMENT_TEXT_SCRIPT, {
       ref: this.ref,
       text: text
     });
   },
-  click() {
-    perform(this._webView, CLICK_ELEMENT_SCRIPT, {
+  async click() {
+    return perform(this._webView, CLICK_ELEMENT_SCRIPT, {
       ref: this.ref
     });
   },
-  tap() {
-    perform(this._webView, TAP_ELEMENT_SCRIPT, {
+  async tap() {
+    return perform(this._webView, TAP_ELEMENT_SCRIPT, {
       ref: this.ref
     });
   },
-  getRect() {
-    return perform(this._webView, GET_ELEMENT_RECT_SCRIPT, {
+  async getRect() {
+    const result = await perform(this._webView, GET_ELEMENT_RECT_SCRIPT, {
       ref: this.ref
-    }).rect;
+    });
+    return result.rect;
   },
-  isVisible() {
-    return perform(this._webView, IS_ELEMENT_VISIBLE_SCRIPT, {
+  async isVisible() {
+    const result = await perform(this._webView, IS_ELEMENT_VISIBLE_SCRIPT, {
       ref: this.ref
-    }).visible;
+    });
+    return result.visible;
   }
 };
 
 function perform(webView, script, params) {
-  const rawResult = webView.stringByEvaluatingJavaScriptFromString_('JSON.stringify((' + script + ').call(this, ' + JSON.stringify(params) + '));');
-  const result = JSON.parse(rawResult.toString());
+  const paramsString = (params !== undefined) ? `, ${JSON.stringify(params)}` : '';
+  const scriptString = `JSON.stringify((${script}).call(this${paramsString}));`;
+
+  if ('stringByEvaluatingJavaScriptFromString_' in webView) {
+    // UIWebView
+    return new Promise((resolve, reject) => {
+      if (isMainThread()) {
+        evaluateJavascript();
+      } else {
+        ObjC.schedule(ObjC.mainQueue, () => {
+          evaluateJavascript();
+        });
+      }
+
+      function evaluateJavascript () {
+        const rawResult = webView.stringByEvaluatingJavaScriptFromString_(scriptString);
+        try {
+          const result = parseResult(rawResult);
+          resolve(result);
+        } catch (e) {
+          reject(e);
+        }
+      }
+    });
+  } else if ('evaluateJavaScript_completionHandler_' in webView) {
+    // WKWebView
+    return new Promise((resolve, reject) => {
+      const completionHandler = new ObjC.Block({
+        retType: 'void',
+        argTypes: ['object', 'pointer'],
+        implementation: function (rawResult, error) {
+          pendingBlocks.delete(completionHandler);
+
+          if (!error.isNull()) {
+            const err = new ObjC.Object(error);
+            reject(new Error(err.toString()));
+            return;
+          }
+          try {
+            const result = parseResult(rawResult);
+            resolve(result);
+          } catch (e) {
+            reject(e);
+          }
+        }
+      });
+      pendingBlocks.add(completionHandler);
+      if (isMainThread()) {
+        webView.evaluateJavaScript_completionHandler_(scriptString, completionHandler);
+      } else {
+        ObjC.schedule(ObjC.mainQueue, () => {
+          webView.evaluateJavaScript_completionHandler_(scriptString, completionHandler);
+        });
+      }
+    });
+  }
+}
+
+function isMainThread() {
+  return ObjC.classes.NSThread.isMainThread();
+}
+
+function parseResult(rawResult) {
+  const strResult = rawResult.toString();
+  if (strResult.length === 0) {
+    throw new Error('UIWebView not ready');
+  }
+  const result = JSON.parse(strResult);
   if (result.error) {
     const e = result.error;
     throw new Error(e.message + ' at: ' + e.stack);
@@ -196,8 +258,10 @@ SET_ELEMENT_TEXT_SCRIPT = `function setElementText(params) {
   try {
     var element = window._fridaElementByRef[params.ref];
     element.value = params.text;
-    var ev = new Event('change');
-    element.dispatchEvent(ev);
+    var changeEvent = new Event('change');
+    var inputEvent = new Event('input');
+    element.dispatchEvent(changeEvent);
+    element.dispatchEvent(inputEvent);
     return {};
   } catch (e) {
     return {
@@ -212,6 +276,7 @@ SET_ELEMENT_TEXT_SCRIPT = `function setElementText(params) {
 CLICK_ELEMENT_SCRIPT = `function clickElement(params) {
   try {
     var element = window._fridaElementByRef[params.ref];
+    element.disabled = false;
     element.click();
     return {};
   } catch (e) {
@@ -227,6 +292,7 @@ CLICK_ELEMENT_SCRIPT = `function clickElement(params) {
 TAP_ELEMENT_SCRIPT = `function tapElement(params) {
   try {
     var element = window._fridaElementByRef[params.ref];
+    element.disabled = false;
     var identifier = Date.now();
     fire(element, 'touchstart', identifier);
     fire(element, 'touchend', identifier);
@@ -285,19 +351,31 @@ IS_ELEMENT_VISIBLE_SCRIPT = `function isElementVisible(params) {
     return document.elementFromPoint(x, y)
   };
 
-  var anyOfFourCornersVisible =
-      element.contains(efp(rect.left, rect.top)) ||
-      element.contains(efp(rect.right, rect.top)) ||
-      element.contains(efp(rect.right, rect.bottom)) ||
-      element.contains(efp(rect.left, rect.bottom));
-
   var rcx = rect.left + rect.width / 2;
   var rcy = rect.top + rect.height / 2;
 
-  var centerVisible = element.contains(efp(rcx, rcy));
+  var elementsAround = [
+    efp(rect.left, rect.top),
+    efp(rect.right, rect.top),
+    efp(rect.right, rect.bottom),
+    efp(rect.left, rect.bottom),
+    efp(rcx, rcy)
+  ];
+
+  var anyCornerVisible = false;
+
+  elementsAround.forEach(function (testElement) {
+    if (testElement === null) {
+      return;
+    }
+
+    anyCornerVisible = anyCornerVisible ||
+      element.contains(testElement) ||
+      testElement.contains(element);
+  });
 
   return {
-    visible: anyOfFourCornersVisible || centerVisible
+    visible: anyCornerVisible
   };
 }`;
 
