@@ -146,9 +146,11 @@ function perform(webView, script, params) {
       });
       pendingBlocks.add(completionHandler);
       if (isMainThread()) {
+        webView.configuration().preferences().setJavaScriptEnabled_(true);
         webView.evaluateJavaScript_completionHandler_(scriptString, completionHandler);
       } else {
         ObjC.schedule(ObjC.mainQueue, () => {
+          webView.configuration().preferences().setJavaScriptEnabled_(true);
           webView.evaluateJavaScript_completionHandler_(scriptString, completionHandler);
         });
       }
