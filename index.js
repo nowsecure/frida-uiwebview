@@ -49,7 +49,7 @@ WebNode.fromWebView = async function (webView, options) {
   return new WebNode(result, webView, mergedOptions);
 };
 
-function getOptions (options) {
+function getOptions(options) {
   const merged = {
     enableJavascript: false
   };
@@ -124,7 +124,7 @@ function perform(webView, script, options, params) {
         });
       }
 
-      function evaluateJavascript () {
+      function evaluateJavascript() {
         const rawResult = webView.stringByEvaluatingJavaScriptFromString_(scriptString);
         try {
           const result = parseResult(rawResult);
@@ -163,7 +163,7 @@ function perform(webView, script, options, params) {
         ObjC.schedule(ObjC.mainQueue, fireEvaluation);
       }
 
-      function fireEvaluation () {
+      function fireEvaluation() {
         if (options.enableJavascript) {
           webView.configuration().preferences().setJavaScriptEnabled_(true);
         }
