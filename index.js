@@ -3,11 +3,11 @@
 let DUMP_DOM_SCRIPT, SET_ELEMENT_TEXT_SCRIPT, CLICK_ELEMENT_SCRIPT, TAP_ELEMENT_SCRIPT, GET_ELEMENT_RECT_SCRIPT, IS_ELEMENT_VISIBLE_SCRIPT;
 const pendingBlocks = new Set();
 
-function get(webViewNode, predicate) {
+function get(webViewNode, predicate, options) {
   return new Promise(function (resolve, reject) {
     let tries = 0;
     async function tryResolve() {
-      const layout = await WebNode.fromWebView(webViewNode.instance);
+      const layout = await WebNode.fromWebView(webViewNode.instance, options);
       if (layout !== null) {
         const node = layout.find(predicate);
         if (node !== null) {
@@ -28,8 +28,9 @@ function get(webViewNode, predicate) {
   });
 }
 
-function WebNode(data, webView) {
+function WebNode(data, webView, options) {
   this._webView = webView;
+  this._options = getOptions(options);
 
   for (let key in data) {
     if (data.hasOwnProperty(key) && key !== 'children') {
@@ -38,14 +39,25 @@ function WebNode(data, webView) {
   }
 
   this.children = data.children.map(childData => {
-    return new WebNode(childData, webView);
+    return new WebNode(childData, webView, options);
   });
 }
 
-WebNode.fromWebView = async function (webView) {
-  const result = await perform(webView, DUMP_DOM_SCRIPT);
-  return new WebNode(result, webView);
+WebNode.fromWebView = async function (webView, options) {
+  const mergedOptions = getOptions(options);
+  const result = await perform(webView, DUMP_DOM_SCRIPT, mergedOptions);
+  return new WebNode(result, webView, mergedOptions);
 };
+
+function getOptions(options) {
+  const merged = {
+    enableJavascript: false
+  };
+
+  Object.assign(merged, options);
+
+  return merged;
+}
 
 WebNode.prototype = {
   forEach(fn) {
@@ -68,36 +80,36 @@ WebNode.prototype = {
     return null;
   },
   async setText(text) {
-    return perform(this._webView, SET_ELEMENT_TEXT_SCRIPT, {
+    return perform(this._webView, SET_ELEMENT_TEXT_SCRIPT, this._options, {
       ref: this.ref,
       text: text
     });
   },
   async click() {
-    return perform(this._webView, CLICK_ELEMENT_SCRIPT, {
+    return perform(this._webView, CLICK_ELEMENT_SCRIPT, this._options, {
       ref: this.ref
     });
   },
   async tap() {
-    return perform(this._webView, TAP_ELEMENT_SCRIPT, {
+    return perform(this._webView, TAP_ELEMENT_SCRIPT, this._options, {
       ref: this.ref
     });
   },
   async getRect() {
-    const result = await perform(this._webView, GET_ELEMENT_RECT_SCRIPT, {
+    const result = await perform(this._webView, GET_ELEMENT_RECT_SCRIPT, this._options, {
       ref: this.ref
     });
     return result.rect;
   },
   async isVisible() {
-    const result = await perform(this._webView, IS_ELEMENT_VISIBLE_SCRIPT, {
+    const result = await perform(this._webView, IS_ELEMENT_VISIBLE_SCRIPT, this._options, {
       ref: this.ref
     });
     return result.visible;
   }
 };
 
-function perform(webView, script, params) {
+function perform(webView, script, options, params) {
   const paramsString = (params !== undefined) ? `, ${JSON.stringify(params)}` : '';
   const scriptString = `JSON.stringify((${script}).call(this${paramsString}));`;
 
@@ -112,7 +124,7 @@ function perform(webView, script, params) {
         });
       }
 
-      function evaluateJavascript () {
+      function evaluateJavascript() {
         const rawResult = webView.stringByEvaluatingJavaScriptFromString_(scriptString);
         try {
           const result = parseResult(rawResult);
@@ -146,11 +158,16 @@ function perform(webView, script, params) {
       });
       pendingBlocks.add(completionHandler);
       if (isMainThread()) {
-        webView.evaluateJavaScript_completionHandler_(scriptString, completionHandler);
+        fireEvaluation();
       } else {
-        ObjC.schedule(ObjC.mainQueue, () => {
-          webView.evaluateJavaScript_completionHandler_(scriptString, completionHandler);
-        });
+        ObjC.schedule(ObjC.mainQueue, fireEvaluation);
+      }
+
+      function fireEvaluation() {
+        if (options.enableJavascript) {
+          webView.configuration().preferences().setJavaScriptEnabled_(true);
+        }
+        webView.evaluateJavaScript_completionHandler_(scriptString, completionHandler);
       }
     });
   }
