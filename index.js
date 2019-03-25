@@ -113,28 +113,7 @@ function perform(webView, script, options, params) {
   const paramsString = (params !== undefined) ? `, ${JSON.stringify(params)}` : '';
   const scriptString = `JSON.stringify((${script}).call(this${paramsString}));`;
 
-  if ('stringByEvaluatingJavaScriptFromString_' in webView) {
-    // UIWebView
-    return new Promise((resolve, reject) => {
-      if (isMainThread()) {
-        evaluateJavascript();
-      } else {
-        ObjC.schedule(ObjC.mainQueue, () => {
-          evaluateJavascript();
-        });
-      }
-
-      function evaluateJavascript() {
-        const rawResult = webView.stringByEvaluatingJavaScriptFromString_(scriptString);
-        try {
-          const result = parseResult(rawResult);
-          resolve(result);
-        } catch (e) {
-          reject(e);
-        }
-      }
-    });
-  } else if ('evaluateJavaScript_completionHandler_' in webView) {
+  if ('evaluateJavaScript_completionHandler_' in webView) {
     // WKWebView
     return new Promise((resolve, reject) => {
       const completionHandler = new ObjC.Block({
@@ -168,6 +147,27 @@ function perform(webView, script, options, params) {
           webView.configuration().preferences().setJavaScriptEnabled_(true);
         }
         webView.evaluateJavaScript_completionHandler_(scriptString, completionHandler);
+      }
+    });
+  } else if ('stringByEvaluatingJavaScriptFromString_' in webView) {
+    // UIWebView
+    return new Promise((resolve, reject) => {
+      if (isMainThread()) {
+        evaluateJavascript();
+      } else {
+        ObjC.schedule(ObjC.mainQueue, () => {
+          evaluateJavascript();
+        });
+      }
+
+      function evaluateJavascript() {
+        const rawResult = webView.stringByEvaluatingJavaScriptFromString_(scriptString);
+        try {
+          const result = parseResult(rawResult);
+          resolve(result);
+        } catch (e) {
+          reject(e);
+        }
       }
     });
   }
