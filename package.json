@@ -1,6 +1,6 @@
 {
   "name": "frida-uiwebview",
-  "version": "2.0.1",
+  "version": "3.0.0",
   "description": "Inspect and manipulate UIWebView-hosted GUIs through Frida",
   "main": "index.js",
   "files": [
