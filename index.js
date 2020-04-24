@@ -111,7 +111,8 @@ function perform(webView, script, options, params) {
   const paramsString = (params !== undefined) ? `, ${JSON.stringify(params)}` : '';
   const scriptString = `JSON.stringify((${script}).call(this${paramsString}));`;
 
-  if ('evaluateJavaScript_completionHandler_' in webView) {
+  if ('evaluateJavaScript_completionHandler_' in webView &&
+      'configuration' in webView) {
     // WKWebView
     return new Promise((resolve, reject) => {
       const completionHandler = new ObjC.Block({
@@ -168,6 +169,8 @@ function perform(webView, script, options, params) {
         }
       }
     });
+  } else {
+    throw new Error(`Unsupported kind of webview: ${webView.$className}`);
   }
 }
 
