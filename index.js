@@ -1,5 +1,7 @@
 let DUMP_DOM_SCRIPT, SET_ELEMENT_TEXT_SCRIPT, CLICK_ELEMENT_SCRIPT, TAP_ELEMENT_SCRIPT, GET_ELEMENT_RECT_SCRIPT, IS_ELEMENT_VISIBLE_SCRIPT;
 const pendingBlocks = new Set();
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 300;
 
 function get(webViewNode, predicate, options) {
   return new Promise(function (resolve, reject) {
@@ -141,7 +143,18 @@ function perform(webView, script, options, params) {
         ObjC.schedule(ObjC.mainQueue, fireEvaluation);
       }
 
-      function fireEvaluation() {
+      function fireEvaluation (retries = MAX_RETRIES) {
+        if (webView.isLoading()) {
+          if (retries - 1 <= 0) {
+            pendingBlocks.delete(completionHandler);
+            reject(new Error('WKWebView not ready'));
+          } else {
+            setTimeout(() => {
+              ObjC.schedule(ObjC.mainQueue, () => fireEvaluation(retries - 1));
+            }, RETRY_DELAY);
+          }
+          return;
+        }
         if (options.enableJavascript) {
           webView.configuration().preferences().setJavaScriptEnabled_(true);
         }
