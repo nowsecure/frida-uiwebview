@@ -5,8 +5,8 @@ Inspect and manipulate UIWebView-hosted GUIs through [Frida](https://www.frida.r
 ## Example
 
 ```js
-const ui = require('frida-uikit');
-const web = require('frida-uiwebview');
+import ui from 'frida-uikit';
+import web from 'frida-uiwebview';
 
 const webView = await ui.get(node => node.type === 'UIWebView');
 

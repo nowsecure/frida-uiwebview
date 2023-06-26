@@ -410,7 +410,4 @@ IS_ELEMENT_VISIBLE_SCRIPT = `function isElementVisible(params) {
   };
 }`;
 
-module.exports = {
-  get: get,
-  WebNode: WebNode
-};
+export { get, WebNode };
