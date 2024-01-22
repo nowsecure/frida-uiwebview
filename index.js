@@ -3,7 +3,7 @@ const pendingBlocks = new Set();
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 300;
 
-function get(webViewNode, predicate, options) {
+export function get(webViewNode, predicate, options) {
   return new Promise(function (resolve, reject) {
     let tries = 0;
     async function tryResolve() {
@@ -28,7 +28,7 @@ function get(webViewNode, predicate, options) {
   });
 }
 
-function WebNode(data, webView, options) {
+export function WebNode(data, webView, options) {
   this._webView = webView;
   this._options = getOptions(options);
 
@@ -409,5 +409,3 @@ IS_ELEMENT_VISIBLE_SCRIPT = `function isElementVisible(params) {
     visible: anyCornerVisible
   };
 }`;
-
-export { get, WebNode };
