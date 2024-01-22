@@ -3,6 +3,7 @@
   "version": "3.0.2",
   "description": "Inspect and manipulate UIWebView-hosted GUIs through Frida",
   "main": "index.js",
+  "type": "module",
   "files": [
     "/index.js"
   ],
