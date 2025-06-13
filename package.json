@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/nowsecure/frida-uiwebview/issues"
   },
-  "homepage": "https://github.com/nowsecure/frida-uiwebview#readme"
+  "homepage": "https://github.com/nowsecure/frida-uiwebview#readme",
+  "dependencies": {
+    "frida-objc-bridge": "^8.0.5"
+  }
 }
