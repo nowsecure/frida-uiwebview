@@ -1,3 +1,5 @@
+import ObjC from 'frida-objc-bridge';
+
 let DUMP_DOM_SCRIPT, SET_ELEMENT_TEXT_SCRIPT, CLICK_ELEMENT_SCRIPT, TAP_ELEMENT_SCRIPT, GET_ELEMENT_RECT_SCRIPT, IS_ELEMENT_VISIBLE_SCRIPT;
 const pendingBlocks = new Set();
 const MAX_RETRIES = 3;
