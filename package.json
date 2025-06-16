@@ -2,6 +2,9 @@
   "name": "frida-uiwebview",
   "version": "4.0.0",
   "description": "Inspect and manipulate UIWebView-hosted GUIs through Frida",
+  "keywords": [
+    "frida-gum"
+  ],
   "main": "index.js",
   "type": "module",
   "files": [
