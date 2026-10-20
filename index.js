@@ -123,7 +123,7 @@ function perform(webView, script, options, params) {
         retType: 'void',
         argTypes: ['object', 'pointer'],
         implementation: function (rawResult, error) {
-          pendingBlocks.delete(completionHandler);
+          ObjC.schedule(ObjC.mainQueue, () => pendingBlocks.delete(completionHandler));
 
           if (!error.isNull()) {
             const err = new ObjC.Object(error);
