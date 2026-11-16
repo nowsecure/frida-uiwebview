@@ -119,11 +119,15 @@ function perform(webView, script, options, params) {
       'configuration' in webView) {
     // WKWebView
     return new Promise((resolve, reject) => {
+      webView.retain();
       const completionHandler = new ObjC.Block({
         retType: 'void',
         argTypes: ['object', 'pointer'],
         implementation: function (rawResult, error) {
-          ObjC.schedule(ObjC.mainQueue, () => pendingBlocks.delete(completionHandler));
+          ObjC.schedule(ObjC.mainQueue, () => {
+            pendingBlocks.delete(completionHandler);
+            webView.release();
+          });
 
           if (!error.isNull()) {
             const err = new ObjC.Object(error);
@@ -149,6 +153,7 @@ function perform(webView, script, options, params) {
         if (webView.isLoading()) {
           if (retries - 1 <= 0) {
             pendingBlocks.delete(completionHandler);
+            webView.release();
             reject(new Error('WKWebView not ready'));
           } else {
             setTimeout(() => {
